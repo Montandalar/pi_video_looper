@@ -7,6 +7,8 @@ import time
 
 import pyudev
 
+from .usb_drive_finder import USBDriveFinder
+
 
 class USBDriveMounter:
     """Service for automatically mounting attached USB drives."""
@@ -34,8 +36,7 @@ class USBDriveMounter:
         """
         self.remove_all()
         # Enumerate USB drive partitions by path like /dev/sda1, etc.
-        nodes = [x.device_node for x in self._context.list_devices(subsystem='block', DEVTYPE='partition')
-                 if 'ID_BUS' in x and x['ID_BUS'] == 'usb']
+        nodes = USBDriveFinder(self._context).get_leaves()
         # Mount each drive under the mount root.
         for i, node in enumerate(nodes):
             path = self._root + str(i)
@@ -49,8 +50,7 @@ class USBDriveMounter:
         return nodes
 
     def has_nodes(self):
-        nodes = [x.device_node for x in self._context.list_devices(subsystem='block', DEVTYPE='partition')
-                 if 'ID_BUS' in x and x['ID_BUS'] == 'usb']
+        nodes = USBDriveFinder(self._context).get_leaves()
         return nodes != []
 
     def start_monitor(self):
