@@ -5,22 +5,19 @@ import glob
 import os
 import shutil
 import re
-import pygame
 import time
 from .usb_drive_mounter import USBDriveMounter
 
 
 class USBDriveReaderCopy(object):
 
-    def __init__(self, config, screen):
+    def __init__(self, config):
         """Create an instance of a file reader that uses the USB drive mounter
         service to keep track of attached USB drives and automatically mount
         them for reading videos.
         """
         self._config = config
-        self._screen = screen
         self._load_config(config)
-        self._pygame_init(config)
         self._mounter = USBDriveMounter(root=self._mount_path,
                                         readonly=self._readonly)
         self._mounter.start_monitor()
@@ -28,27 +25,6 @@ class USBDriveReaderCopy(object):
         if not os.path.exists(self._target_path):
             os.makedirs(self._target_path)
         #subprocess.call(['mkdir', self._target_path])
-
-    def _pygame_init(self, config):
-        self._bgcolor = (52,52,52)
-        self._fgcolor = (149,193,26)
-        self._bordercolor = (255,255,255)
-        self._fontcolor = (255,255,255)
-        self._font = pygame.font.Font(None, 40)
-
-        #positions and sizes:
-        self.screenwidth = pygame.display.Info().current_w
-        self.screenheight = pygame.display.Info().current_h
-        self.pwidth=0.8*self.screenwidth
-        self.pheight=0.05*self.screenheight
-        self.borderthickness = 2
-
-        #create rects:
-        self.borderrect   =  pygame.Rect((self.screenwidth / 2) - (self.pwidth / 2),
-                                         (self.screenheight / 2) - (self.pheight / 2),
-                                         self.pwidth,
-                                         self.pheight)
-
 
     def _load_config(self, config):
         self._mount_path = config.get('usb_drive', 'mount_path')
@@ -63,7 +39,6 @@ class USBDriveReaderCopy(object):
                                  .split(','))
 
     def copy_files(self, paths):
-        self.clear_screen()
 
         copy_mode = self._copy_mode
         copy_mode_info = "(from config)"
@@ -89,7 +64,6 @@ class USBDriveReaderCopy(object):
                 copy_mode_info = "(from config)"
 
             #inform about copymode
-            self.draw_info_text("Mode: " + copy_mode + " " + copy_mode_info)
 
             if copy_mode == "replace":
                 # iterate over target path for deleting:
@@ -107,50 +81,9 @@ class USBDriveReaderCopy(object):
             if self._copyloader:
                 loader_file_path = '{0}/{1}'.format(path.rstrip('/'), 'loader.png')
                 if os.path.exists(loader_file_path):
-                    self.clear_screen()
-                    self.draw_info_text("Copying splashscreen file...")
                     time.sleep(2)
                     self.copy_with_progress(loader_file_path,'/home/pi/loader.png')
                     
-    def draw_copy_progress(self, copied, total):
-        perc = 100 * copied / total
-        assert (isinstance(perc, float))
-        assert (0. <= perc <= 100.)
-
-        progressrect =  pygame.Rect((self.screenwidth / 2) - (self.pwidth / 2) + self.borderthickness,
-                                                                (self.screenheight / 2) - (self.pheight / 2) + self.borderthickness,
-                                                                (self.pwidth-(2*self.borderthickness))*(perc/100),
-                                                                self.pheight - (2*self.borderthickness))
-
-
-        #border
-        pygame.draw.rect(self._screen, self._bordercolor, self.borderrect, self.borderthickness)
-        #progress
-        pygame.draw.rect(self._screen, self._fgcolor, progressrect)
-        #progress_text
-        self.draw_progress_text(str(int(round(perc)))+"%")
-
-        pygame.display.update(self.borderrect)
-
-    def draw_info_text(self, message):
-        label1 = self._font.render(message, True, self._fontcolor, self._bgcolor)
-        l1w, l1h = label1.get_size()
-        self._screen.blit(label1, (self.screenwidth / 2 - l1w / 2, self.screenheight / 2 - l1h - self.pheight/2 - 3*self.borderthickness))
-        pygame.display.update()
-
-    def draw_progress_text(self, progress):
-        label1 = self._font.render(progress, True, self._bgcolor, self._fgcolor)
-        l1w, l1h = label1.get_size()
-        self._screen.blit(label1, (self.screenwidth / 2 - l1w / 2, self.screenheight / 2 - l1h / 2 + self.borderthickness))
-
-    def clear_screen(self, full=True):
-        if full:
-            self._screen.fill(self._bgcolor)
-            pygame.display.update()
-        else:
-            self._screen.fill(self._bgcolor,self.borderrect)
-            pygame.display.update(self.borderrect)
-
     #checks for file without and with any extension
     def check_file_exists(self,file):
         return (glob.glob(file + ".*") + glob.glob(file)) != []
@@ -182,7 +115,7 @@ class USBDriveReaderCopy(object):
             size = os.stat(src).st_size
             with open(src, 'rb') as fsrc:
                 with open(dst, 'wb') as fdst:
-                    self.copyfileobj(fsrc, fdst, callback=self.draw_copy_progress, total=size)
+                    self.copyfileobj(fsrc, fdst, total=size)
         return dst
 
     def copyfileobj(self, fsrc, fdst, callback, total, length=16 * 1024):
@@ -198,9 +131,6 @@ class USBDriveReaderCopy(object):
     def copy_with_progress(self, src, dst, *, follow_symlinks=True):
         if os.path.isdir(dst):
             dst = os.path.join(dst, os.path.basename(src))
-
-        # clear screen before copying
-        self.clear_screen(False)
 
         self.copyfile(src, dst, follow_symlinks=follow_symlinks)
         # shutil.copymode(src, dst)
@@ -230,6 +160,6 @@ class USBDriveReaderCopy(object):
         return 'Insert USB drive with compatible movies. Copy Mode: files will be copied to RPi.'
 
 
-def create_file_reader(config, screen):
+def create_file_reader(config):
     """Create new file reader based on mounting USB drives."""
-    return USBDriveReaderCopy(config, screen)
+    return USBDriveReaderCopy(config)

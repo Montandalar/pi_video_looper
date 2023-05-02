@@ -10,7 +10,6 @@ import subprocess
 import sys
 import signal
 import time
-import pygame
 import threading
 from datetime import datetime
 
@@ -71,14 +70,6 @@ class VideoLooper:
         self._fgcolor = list(map(int, self._config.get('video_looper', 'fgcolor')
                                              .translate(str.maketrans('','', ','))
                                              .split()))
-        # Initialize pygame and display a blank screen.
-        pygame.display.init()
-        pygame.font.init()
-        pygame.mouse.set_visible(False)
-        self._screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN | pygame.NOFRAME)
-        self._size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-        self._bgimage = self._load_bgimage() #a tupple with pyimage, xpos, ypos
-        self._blank_screen()
         # Load configured video player and file reader modules.
         self._player = self._load_player()
         self._reader = self._load_file_reader()
@@ -94,18 +85,10 @@ class VideoLooper:
         self._sound_vol = 0
         # Set other static internal state.
         self._extensions = '|'.join(self._player.supported_extensions())
-        self._small_font = pygame.font.Font(None, 50)
-        self._big_font   = pygame.font.Font(None, 250)
         self._running    = True
         self._playbackStopped = False
         #used for not waiting the first time
         self._firstStart = True
-
-        # start keyboard handler thread:
-        # Event handling for key press, if keyboard control is enabled
-        if self._keyboard_control:
-            self._keyboard_thread = threading.Thread(target=self._handle_keyboard_shortcuts, daemon=True)
-            self._keyboard_thread.start()
 
     def _print(self, message):
         """Print message to standard output if console output is enabled."""
@@ -116,47 +99,12 @@ class VideoLooper:
     def _load_player(self):
         """Load the configured video player and return an instance of it."""
         module = self._config.get('video_looper', 'video_player')
-        return importlib.import_module('.' + module, 'Adafruit_Video_Looper').create_player(self._config, screen=self._screen, bgimage=self._bgimage)
+        return importlib.import_module('.' + module, 'Adafruit_Video_Looper').create_player(self._config)
 
     def _load_file_reader(self):
         """Load the configured file reader and return an instance of it."""
         module = self._config.get('video_looper', 'file_reader')
-        return importlib.import_module('.' + module, 'Adafruit_Video_Looper').create_file_reader(self._config, self._screen)
-
-    def _load_bgimage(self):
-        """Load the configured background image and return an instance of it."""
-        image = None
-        image_x = 0
-        image_y = 0
-
-        if self._config.has_option('video_looper', 'bgimage'):
-            imagepath = self._config.get('video_looper', 'bgimage')
-            if imagepath != "" and os.path.isfile(imagepath):
-                self._print('Using ' + str(imagepath) + ' as a background')
-                image = pygame.image.load(imagepath)
-
-                screen_w, screen_h = self._size
-                image_w, image_h = image.get_size()
-
-                screen_aspect_ratio = screen_w / screen_h
-                photo_aspect_ratio = image_w / image_h
-
-                if screen_aspect_ratio < photo_aspect_ratio:  # Width is binding
-                    new_image_w = screen_w
-                    new_image_h = int(new_image_w / photo_aspect_ratio)
-                    image = pygame.transform.scale(image, (new_image_w, new_image_h))
-                    image_y = (screen_h - new_image_h) // 2
-
-                elif screen_aspect_ratio > photo_aspect_ratio:  # Height is binding
-                    new_image_h = screen_h
-                    new_image_w = int(new_image_h * photo_aspect_ratio)
-                    image = pygame.transform.scale(image, (new_image_w, new_image_h))
-                    image_x = (screen_w - new_image_w) // 2
-
-                else:  # Images have the same aspect ratio
-                    image = pygame.transform.scale(image, (screen_w, screen_h))
-
-        return (image, image_x, image_y)
+        return importlib.import_module('.' + module, 'Adafruit_Video_Looper').create_file_reader(self._config)
 
     def _is_number(self, s):
         try:
@@ -249,22 +197,6 @@ class VideoLooper:
         # Create a playlist with the sorted list of movies.
         return Playlist(sorted(movies))
 
-    def _blank_screen(self):
-        """Render a blank screen filled with the background color and optional the background image."""
-        self._screen.fill(self._bgcolor)
-        if self._bgimage[0] is not None:
-            self._screen.blit(self._bgimage[0], (self._bgimage[1], self._bgimage[2]))
-        pygame.display.flip()
-
-    def _render_text(self, message, font=None):
-        """Draw the provided message and return as pygame surface of it rendered
-        with the configured foreground and background color.
-        """
-        # Default to small font if not provided.
-        if font is None:
-            font = self._small_font
-        return font.render(message, True, self._fgcolor, self._bgcolor)
-
     def _animate_countdown(self, playlist):
         """Print text with the number of loaded movies and a quick countdown
         message if the on screen display is enabled.
@@ -273,25 +205,7 @@ class VideoLooper:
         message = 'Found {0} media file{1}.'.format(playlist.length(), 
             's' if playlist.length() >= 2 else '')
         self._print(message)
-        # Do nothing else if the OSD is turned off.
-        if not self._osd:
-            return
-        # Draw message with number of movies loaded and animate countdown.
-        # First render text that doesn't change and get static dimensions.
-        label1 = self._render_text(message + ' Starting playback in:')
-        l1w, l1h = label1.get_size()
-        sw, sh = self._screen.get_size()
         for i in range(self._countdown_time, 0, -1):
-            # Each iteration of the countdown rendering changing text.
-            label2 = self._render_text(str(i), self._big_font)
-            l2w, l2h = label2.get_size()
-            # Clear screen and draw text with line1 above line2 and all
-            # centered horizontally and vertically.
-            self._screen.fill(self._bgcolor)
-            self._screen.blit(label1, (sw/2-l1w/2, sh/2-l2h/2-l1h))
-            self._screen.blit(label2, (sw/2-l2w/2, sh/2-l2h/2))
-            pygame.display.update()
-            # Pause for a second between each frame.
             time.sleep(1)
 
     def _idle_message(self):
@@ -299,44 +213,14 @@ class VideoLooper:
         # Print message to console.
         message = self._reader.idle_message()
         self._print(message)
-        # Do nothing else if the OSD is turned off.
-        if not self._osd:
-            return
-        # Display idle message in center of screen.
-        label = self._render_text(message)
-        lw, lh = label.get_size()
-        sw, sh = self._screen.get_size()
-        self._screen.fill(self._bgcolor)
-        self._screen.blit(label, (sw/2-lw/2, sh/2-lh/2))
-        # If keyboard control is enabled, display message about it
-        if self._keyboard_control:
-            label2 = self._render_text('press ESC to quit')
-            l2w, l2h = label2.get_size()
-            self._screen.blit(label2, (sw/2-l2w/2, sh/2-l2h/2+lh))
-        pygame.display.update()
-
-    def display_message(self,message):
-        self._print(message)
-        # Do nothing else if the OSD is turned off.
-        if not self._osd:
-            return
-        # Display idle message in center of screen.
-        label = self._render_text(message)
-        lw, lh = label.get_size()
-        sw, sh = self._screen.get_size()
-        self._screen.fill(self._bgcolor)
-        self._screen.blit(label, (sw/2-lw/2, sh/2-lh/2))
-        pygame.display.update()
 
     def _prepare_to_run_playlist(self, playlist):
         """Display messages when a new playlist is loaded."""
         # If there are movies to play show a countdown first (if OSD enabled),
         # or if no movies are available show the idle message.
-        self._blank_screen()
         self._firstStart = True
         if playlist.length() > 0:
             self._animate_countdown(playlist)
-            self._blank_screen()
         else:
             self._idle_message()
 
@@ -354,31 +238,6 @@ class VideoLooper:
             cmd.extend(('set', self._alsa_hw_vol_control, '--', self._alsa_hw_vol))
             subprocess.check_call(cmd)
             
-    def _handle_keyboard_shortcuts(self):
-        while self._running:
-            event = pygame.event.wait()
-            if event.type == pygame.KEYDOWN:
-                # If pressed key is ESC quit program
-                if event.key == pygame.K_ESCAPE:
-                    self._print("ESC was pressed. quitting...")
-                    self.quit()
-                if event.key == pygame.K_k:
-                    self._print("k was pressed. skipping...")
-                    self._player.stop(3)
-                if event.key == pygame.K_s:
-                    if self._playbackStopped:
-                        self._print("s was pressed. starting...")
-                        self._playbackStopped = False
-                    else:
-                        self._print("s was pressed. stopping...")
-                        self._playbackStopped = True
-                        self._player.stop(3)
-                if event.key == pygame.K_p:
-                    self._print("p was pressed. shutting down...")
-                    self.quit(True)
-                    
-
-
     def run(self):
         """Main program loop.  Will never return!"""
         # Get playlist of movies to play from file reader.
@@ -429,8 +288,6 @@ class VideoLooper:
                 # Rebuild playlist and show countdown again (if OSD enabled).
                 playlist = self._build_playlist()
                 #refresh background image
-                if self._copyloader:
-                    self._bgimage = self._load_bgimage()
                 self._prepare_to_run_playlist(playlist)
                 self._set_hardware_volume()
                 movie = playlist.get_next(self._is_random, self._resume_playlist)
@@ -447,7 +304,6 @@ class VideoLooper:
         self._playbackStopped = True
         if self._player is not None:
             self._player.stop()
-        pygame.quit()
         if shutdown:
             os.system("sudo shutdown now")
         self._running = False
