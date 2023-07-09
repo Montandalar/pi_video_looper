@@ -83,8 +83,6 @@ class CVLCPlayer:
             args.append('--no-osd')
         
         args.append(movie.filename)       # Add movie file path.
-        #DEBUG ONLY:
-        print(args)
         # Run cvlc process and direct standard output to /dev/null.
         self._process = subprocess.Popen(args,
                                          stdout=open(os.devnull, 'wb'),

@@ -241,15 +241,11 @@ class VideoLooper:
     def run(self):
         """Main program loop.  Will never return!"""
         # Get playlist of movies to play from file reader.
-        self._print("run1")
         playlist = self._build_playlist()
         self._print("playlist={}".format(playlist))
         self._prepare_to_run_playlist(playlist)
-        self._print("run2")
         self._set_hardware_volume()
-        self._print("run3")
         movie = playlist.get_next(self._is_random, self._resume_playlist)
-        self._print("run4")
         # Main loop to play videos in the playlist and listen for file changes.
         while self._running:
             # Load and play a new movie if nothing is playing.
@@ -324,18 +320,13 @@ if __name__ == '__main__':
     print('Starting Adafruit Video Looper.')
     # Default config path to /boot.
     config_path = '/boot/video_looper.ini'
-    print('__main__ 1')
     # Override config path if provided as parameter.
     if len(sys.argv) == 2:
         config_path = sys.argv[1]
-    print('__main__ 2')
     # Create video looper.
     videolooper = VideoLooper(config_path)
-    print('__main__ 3')
     # Configure signal handlers to quit on TERM or INT signal.
     signal.signal(signal.SIGTERM, videolooper.signal_quit)
-    print('__main__ 4')
     signal.signal(signal.SIGINT, videolooper.signal_quit)
-    print('__main__ 5')
     # Run the main loop.
     videolooper.run()
