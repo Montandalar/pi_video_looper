@@ -13,7 +13,7 @@ import time
 import threading
 from datetime import datetime
 
-from .alsa_config import parse_hw_device
+from .alsa_config import AlsaConfig
 from .model import Playlist, Movie
 from .playlist_builders import build_playlist_m3u
 
@@ -74,7 +74,7 @@ class VideoLooper:
         self._player = self._load_player()
         self._reader = self._load_file_reader()
         # Load ALSA hardware configuration.
-        self._alsa_hw_device = parse_hw_device(self._config.get('alsa', 'hw_device'))
+        self._alsa_hw_device = AlsaConfig.parse_hw_device_tuple(self._config.get('alsa', 'hw_device'))
         self._alsa_hw_vol_control = self._config.get('alsa', 'hw_vol_control')
         self._alsa_hw_vol_file = self._config.get('alsa', 'hw_vol_file')
         # default ALSA hardware volume (volume will not be changed)
@@ -241,10 +241,15 @@ class VideoLooper:
     def run(self):
         """Main program loop.  Will never return!"""
         # Get playlist of movies to play from file reader.
+        self._print("run1")
         playlist = self._build_playlist()
+        self._print("playlist={}".format(playlist))
         self._prepare_to_run_playlist(playlist)
+        self._print("run2")
         self._set_hardware_volume()
+        self._print("run3")
         movie = playlist.get_next(self._is_random, self._resume_playlist)
+        self._print("run4")
         # Main loop to play videos in the playlist and listen for file changes.
         while self._running:
             # Load and play a new movie if nothing is playing.
@@ -275,7 +280,6 @@ class VideoLooper:
 
                     # Start playing the first available movie.
                     self._print('Playing movie: {0} {1}'.format(movie, infotext))
-                    # todo: maybe clear screen to black so that background (image/color) is not visible for videos with a resolution that is < screen resolution
                     self._player.play(movie, loop=-1 if playlist.length()==1 else None, vol = self._sound_vol)
 
             # Check for changes in the file search path (like USB drives added)
@@ -320,13 +324,18 @@ if __name__ == '__main__':
     print('Starting Adafruit Video Looper.')
     # Default config path to /boot.
     config_path = '/boot/video_looper.ini'
+    print('__main__ 1')
     # Override config path if provided as parameter.
     if len(sys.argv) == 2:
         config_path = sys.argv[1]
+    print('__main__ 2')
     # Create video looper.
     videolooper = VideoLooper(config_path)
+    print('__main__ 3')
     # Configure signal handlers to quit on TERM or INT signal.
     signal.signal(signal.SIGTERM, videolooper.signal_quit)
+    print('__main__ 4')
     signal.signal(signal.SIGINT, videolooper.signal_quit)
+    print('__main__ 5')
     # Run the main loop.
     videolooper.run()

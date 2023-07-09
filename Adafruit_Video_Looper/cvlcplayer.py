@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import time
 
-from .alsa_config import parse_hw_device
+from .alsa_config import AlsaConfig
 
 class CVLCPlayer:
 
@@ -37,9 +37,9 @@ class CVLCPlayer:
         self._extra_args = config.get('cvlc', 'extra_args').split()
         self._sound = config.get('cvlc', 'sound').lower()
         assert self._sound in ('hdmi', 'alsa'), 'Unknown cvlc sound configuration value: {0} Expected both or alsa.'.format(self._sound)
-        self._alsa_hw_device = parse_hw_device(config.get('alsa', 'hw_device'))
+        self._alsa_hw_device = AlsaConfig.parse_hw_device_str(config.get('alsa', 'hw_device'))
         if self._alsa_hw_device != None and self._sound == 'alsa':
-            self._sound_args = ['--aout=alsa', '--alsa-audio-device=hw:{},{}'.format(self._alsa_hw_device[0], self._alsa_hw_device[1])]
+            self._sound_args = ['--aout=alsa', '--alsa-audio-device=hw:{}'.format(self._alsa_hw_device)]
 
         self._show_titles = config.getboolean('cvlc', 'show_titles')
         if self._show_titles:
@@ -59,7 +59,7 @@ class CVLCPlayer:
         """Play the provided movie file, optionally looping it repeatedly."""
         self.stop(3)  # Up to 3 second delay to let the old player stop.
         # Assemble list of arguments.
-        args = ['sudo', '-u','pi', 'cvlc', '-q']
+        args = ['sudo', '-u','pi', 'cvlc']
         if self._sound_args:
             args.extend(self._sound_args)     # Add sound arguments.
         args.extend(self._extra_args)     # Add extra arguments from config.
